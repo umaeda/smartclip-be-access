@@ -6,7 +6,7 @@ from app.api.routes import api_router
 from app.core.config import settings
 from app.db.session import engine, SessionLocal
 from app.db.base import Base
-
+from fastapi.routing import APIRoute
 # Create database tables
 # Comentar esta linha para produção, pois o Azure Functions não deve criar tabelas automaticamente
 # Base.metadata.create_all(bind=engine)
@@ -27,6 +27,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+for route in app.router.routes:
+    print(f"Path: {route.path}, Name: {route.name}")
+
 # Dependency to get DB session
 def get_db():
     db = SessionLocal()
@@ -44,5 +47,6 @@ def health_check():
     return {"status": "healthy"}
 
 if __name__ == "__main__":
+    print(f"API Prefix: {settings.API_STR}")
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
