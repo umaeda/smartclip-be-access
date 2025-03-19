@@ -15,9 +15,7 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     description="FastAPI backend with JWT authentication and role-based access control",
     version="0.1.0",
-    openapi_url=f"{settings.API_STR}/openapi.json",
-    # Adicionar root_path para compatibilidade com Azure Functions
-    root_path=""
+    openapi_url=f"{settings.API_STR}/openapi.json"
 )
 
 # Set up CORS middleware
