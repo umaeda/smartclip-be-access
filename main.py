@@ -17,7 +17,7 @@ app = FastAPI(
     version="0.1.0",
     openapi_url=f"{settings.API_STR}/openapi.json",
     # Adicionar root_path para compatibilidade com Azure Functions
-    root_path="/api"
+    root_path=""
 )
 
 # Set up CORS middleware

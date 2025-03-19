@@ -4,7 +4,7 @@ from mangum import Mangum
 from main import app
 
 # Crie um manipulador HTTP do Azure Functions que direciona as requisições para o FastAPI
-handler = Mangum(app)
+handler = Mangum(app, lifespan="off", api_gateway_base_path="/api")
 
 # Defina a função do Azure Functions
 async def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
