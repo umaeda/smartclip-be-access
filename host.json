@@ -14,7 +14,10 @@
   },
   "extensions": {
     "http": {
-      "routePrefix": ""
+      "routePrefix": "",
+      "customHeaders": {
+        "Access-Control-Allow-Origin": "*"
+      }
     }
   }
 }
