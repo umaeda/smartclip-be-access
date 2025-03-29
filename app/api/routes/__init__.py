@@ -1,13 +1,11 @@
 from fastapi import APIRouter
 
-from app.api.routes import auth, videos
-
 api_router = APIRouter()
 
-# Include all route modules
-api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
-api_router.include_router(videos.router, prefix="/videos", tags=["videos"])
+# Import the routers after creating api_router
+from app.api.routes.auth import router as auth_router
+from app.api.routes.videos import router as videos_router
 
-# Add more routers here as needed
-# api_router.include_router(users.router, prefix="/users", tags=["users"])
-# api_router.include_router(roles.router, prefix="/roles", tags=["roles"])
+# Include the routers
+api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
+api_router.include_router(videos_router, prefix="/videos", tags=["videos"])

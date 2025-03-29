@@ -75,10 +75,17 @@ def login_access_token(
     # Reset failed attempts counter on successful login
     brute_force_protection.reset_attempts(identifier)
     
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # Create user data to include in token
+    user_data = {
+        "name": user.full_name if hasattr(user, "full_name") else "",
+        "email": user.email,
+        "profile": user.profile_type
+    }
+    
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES) 
     return {
         "access_token": create_access_token(
-            subject=str(user.guid), expires_delta=access_token_expires
+            subject=str(user.guid), expires_delta=access_token_expires, user_data=user_data
         ),
         "token_type": "bearer",
     }
@@ -113,12 +120,19 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)) -> Any:
     
     db.commit()
     db.refresh(user)
-    
+
+    # Create user data to include in token
+    user_data = {
+        "name": user.full_name if hasattr(user, "full_name") and user.full_name else user_info.get("name", ""),
+        "email": user.email,
+        "profile": user.profile_type
+    }
+
     # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return {
         "access_token": create_access_token(
-            subject=str(user.guid), expires_delta=access_token_expires
+            subject=str(user.guid), expires_delta=access_token_expires, user_data=user_data
         ),
         "token_type": "bearer",
     }
@@ -172,10 +186,17 @@ async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
         user.is_verified = True
         db.commit()
     
+    # Create user data to include in token
+    user_data = {
+        "name": user.full_name if hasattr(user, "full_name") else "",
+        "email": user.email,
+        "profile": user.profile_type
+    }
+    
     # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        subject=str(user.guid), expires_delta=access_token_expires
+        subject=str(user.guid), expires_delta=access_token_expires, user_data=user_data
     )
     
     # Redirect to frontend with token

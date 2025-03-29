@@ -1,10 +1,10 @@
-from typing import Generator, List, Optional
+from typing import Generator, List, Optional, Tuple, Dict, Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
-from pydantic import ValidationError
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.core.config import settings
 from app.core.security import JWT_ALGORITHM
@@ -27,30 +27,92 @@ def get_db() -> Generator:
     finally:
         db.close()
 
+# Helper function to validate JWT token
+def validate_token(token: str) -> Tuple[str, Dict[str, Any]]:
+    """
+    Validates a JWT token and returns the user_id and payload if valid.
+    Raises HTTPException if token is invalid or expired.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        # Log token information for debugging
+        print(f"Validating token: {token[:10]}...")
+        print(f"Using SECRET_KEY: {settings.SECRET_KEY[:5]}...")
+        print(f"Using JWT_ALGORITHM: {JWT_ALGORITHM}")
+        
+        # Decode token        
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[JWT_ALGORITHM]
+        )
+        
+        # Log successful decode
+        print(f"Token decoded successfully")
+        
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            print("Token missing 'sub' claim")
+            raise credentials_exception
+        
+        # Check if token is expired
+        exp = payload.get("exp")
+        if exp is None:
+            print("Token missing 'exp' claim")
+            raise credentials_exception
+        
+        # Convert exp to datetime and check if it's expired
+        current_time = datetime.utcnow().timestamp()
+        if current_time > exp:
+            print(f"Token expired: {exp} < {current_time}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        print(f"Token valid for user_id: {user_id}")
+        return user_id, payload
+            
+    except JWTError as e:
+        print(f"JWT Error: {str(e)}")
+        print(f"Token: {token[:10]}...")
+        print(f"SECRET_KEY: {settings.SECRET_KEY[:5]}...")
+        print(f"JWT_ALGORITHM: {JWT_ALGORITHM}")
+        
+        # Try to decode without verification for debugging
+        try:
+            # This is just for debugging - never use unverified tokens in production
+            header = jwt.get_unverified_header(token)
+            print(f"Token header: {header}")
+        except Exception as header_error:
+            print(f"Could not parse token header: {str(header_error)}")
+            
+        raise credentials_exception
+
 # Current user dependency
 def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)
 ) -> User:
-    try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[JWT_ALGORITHM]
-        )
-        token_data = TokenPayload(**payload)
-    except (JWTError, ValidationError):
+    print("get_current_user function called")  # Debug print
+    
+    # Validate token and get user_id
+    user_id, _ = validate_token(token)
+    
+    # Get user from database
+    user = db.query(User).filter(User.guid == user_id).first()
+    if user is None:
+        print(f"User not found with guid: {user_id}")  # Debug print
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Could not validate credentials",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user = db.query(User).filter(User.guid == token_data.sub).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
-        )
+    print(f"User authenticated: {user.email}")  # Debug print
     return user
 
 # Active user dependency

@@ -19,12 +19,18 @@ app = FastAPI(
 )
 
 # Set up CORS middleware
+origins = [str(origin) for origin in settings.BACKEND_CORS_ORIGINS]
+for origin in origins:
+    print(f"origin: {origin}")
+    
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,
 )
 
 for route in app.router.routes:
@@ -46,8 +52,3 @@ app.include_router(api_router, prefix=settings.API_STR)
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
-
-if __name__ == "__main__":
-    print(f"API Prefix: {settings.API_STR}")
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
