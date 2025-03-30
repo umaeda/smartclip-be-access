@@ -8,13 +8,14 @@ logger = get_logger("videos")
 
 from app.api.deps import get_db, has_permission, get_current_verified_user
 from app.core.exceptions import VideoNotValidatedException
+from app.core.csrf import csrf_protect
 from app.models.user import User
 from app.models.video import Video
 from app.schemas.video import VideoCreate, Video as VideoSchema
 
 router = APIRouter()
 
-@router.post("/", response_model=VideoSchema)
+@router.post("/", response_model=VideoSchema, dependencies=[Depends(csrf_protect())])
 def create_video(
     *,
     db: Session = Depends(get_db),

@@ -6,6 +6,7 @@ from app.api.routes import api_router
 from app.core.config import settings
 from app.core.logger import app_logger, RequestLoggingMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.core.csrf import CSRFMiddleware
 from app.db.session import engine, SessionLocal
 from app.db.base import Base
 from fastapi.routing import APIRoute
@@ -34,6 +35,9 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=600,
 )
+
+# Add CSRF protection middleware
+app.add_middleware(CSRFMiddleware)
 
 # Add request logging middleware
 app.add_middleware(RequestLoggingMiddleware)
