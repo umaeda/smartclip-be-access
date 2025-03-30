@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.routes import api_router
 from app.core.config import settings
+from app.core.logger import app_logger, RequestLoggingMiddleware
 from app.db.session import engine, SessionLocal
 from app.db.base import Base
 from fastapi.routing import APIRoute
@@ -21,7 +22,7 @@ app = FastAPI(
 # Set up CORS middleware
 origins = [str(origin) for origin in settings.BACKEND_CORS_ORIGINS]
 for origin in origins:
-    print(f"origin: {origin}")
+    app_logger.debug(f"CORS origin: {origin}")
     
 app.add_middleware(
     CORSMiddleware,
@@ -33,8 +34,11 @@ app.add_middleware(
     max_age=600,
 )
 
+# Add request logging middleware
+app.add_middleware(RequestLoggingMiddleware)
+
 for route in app.router.routes:
-    print(f"Path: {route.path}, Name: {route.name}")
+    app_logger.debug(f"Registered route - Path: {route.path}, Name: {route.name}")
 
 # Dependency to get DB session
 def get_db():
@@ -46,6 +50,9 @@ def get_db():
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_STR)
+
+# Log application startup
+app_logger.info(f"Application {settings.PROJECT_NAME} initialized with API at {settings.API_STR}")
 
 
 # Health check endpoint
