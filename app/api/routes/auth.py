@@ -8,6 +8,8 @@ from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
 from starlette.responses import RedirectResponse
 
+from app.core.csrf import csrf_protect
+
 from app.api.deps import get_db
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password, get_password_hash, brute_force_protection
@@ -95,7 +97,7 @@ def login_access_token(
         "token_type": "bearer",
     }
 
-@router.post("/register", response_model=Token)
+@router.post("/register", response_model=Token, dependencies=[Depends(csrf_protect())])
 def register_user(user_in: UserCreate, db: Session = Depends(get_db)) -> Any:
     """Register a new user and return an access token"""
     logger.info(f"Registration attempt for email: {user_in.email}")
