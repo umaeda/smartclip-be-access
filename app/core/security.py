@@ -8,8 +8,9 @@ from passlib.context import CryptContext
 from argon2 import PasswordHasher
 
 from app.core.config import settings
+from app.core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 argon2_hasher = PasswordHasher()
