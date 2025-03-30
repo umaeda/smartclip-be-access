@@ -41,9 +41,10 @@ def validate_token(token: str) -> Tuple[str, Dict[str, Any]]:
     
     try:
         # Log token information for debugging
-        print(f"Validating token: {token[:10]}...")
-        print(f"Using SECRET_KEY: {settings.SECRET_KEY[:5]}...")
-        print(f"Using JWT_ALGORITHM: {JWT_ALGORITHM}")
+        from app.core.logger import app_logger as logger
+        logger.debug(f"Validating token: {token[:10]}...")
+        logger.debug(f"Using SECRET_KEY: {settings.SECRET_KEY[:5]}...")
+        logger.debug(f"Using JWT_ALGORITHM: {JWT_ALGORITHM}")
         
         # Decode token        
         payload = jwt.decode(
@@ -51,45 +52,45 @@ def validate_token(token: str) -> Tuple[str, Dict[str, Any]]:
         )
         
         # Log successful decode
-        print(f"Token decoded successfully")
+        logger.debug("Token decoded successfully")
         
         user_id: str = payload.get("sub")
         if user_id is None:
-            print("Token missing 'sub' claim")
+            logger.warning("Token missing 'sub' claim")
             raise credentials_exception
         
         # Check if token is expired
         exp = payload.get("exp")
         if exp is None:
-            print("Token missing 'exp' claim")
+            logger.warning("Token missing 'exp' claim")
             raise credentials_exception
         
         # Convert exp to datetime and check if it's expired
         current_time = datetime.utcnow().timestamp()
         if current_time > exp:
-            print(f"Token expired: {exp} < {current_time}")
+            logger.warning(f"Token expired: {exp} < {current_time}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token expired",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        print(f"Token valid for user_id: {user_id}")
+        logger.debug(f"Token valid for user_id: {user_id}")
         return user_id, payload
             
     except JWTError as e:
-        print(f"JWT Error: {str(e)}")
-        print(f"Token: {token[:10]}...")
-        print(f"SECRET_KEY: {settings.SECRET_KEY[:5]}...")
-        print(f"JWT_ALGORITHM: {JWT_ALGORITHM}")
+        logger.error(f"JWT Error: {str(e)}")
+        logger.debug(f"Token: {token[:10]}...")
+        logger.debug(f"SECRET_KEY: {settings.SECRET_KEY[:5]}...")
+        logger.debug(f"JWT_ALGORITHM: {JWT_ALGORITHM}")
         
         # Try to decode without verification for debugging
         try:
             # This is just for debugging - never use unverified tokens in production
             header = jwt.get_unverified_header(token)
-            print(f"Token header: {header}")
+            logger.debug(f"Token header: {header}")
         except Exception as header_error:
-            print(f"Could not parse token header: {str(header_error)}")
+            logger.error(f"Could not parse token header: {str(header_error)}")
             
         raise credentials_exception
 
@@ -97,7 +98,8 @@ def validate_token(token: str) -> Tuple[str, Dict[str, Any]]:
 def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)
 ) -> User:
-    print("get_current_user function called")  # Debug print
+    from app.core.logger import app_logger as logger
+    logger.debug("get_current_user function called")
     
     # Validate token and get user_id
     user_id, _ = validate_token(token)
@@ -105,14 +107,14 @@ def get_current_user(
     # Get user from database
     user = db.query(User).filter(User.guid == user_id).first()
     if user is None:
-        print(f"User not found with guid: {user_id}")  # Debug print
+        logger.warning(f"User not found with guid: {user_id}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    print(f"User authenticated: {user.email}")  # Debug print
+    logger.debug(f"User authenticated: {user.email}")
     return user
 
 # Active user dependency

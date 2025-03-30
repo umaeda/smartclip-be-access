@@ -33,15 +33,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         
         # Define política de segurança de conteúdo (CSP)
-        # Esta é uma política básica que pode ser ajustada conforme necessário
+        # Política ajustada para permitir requisições necessárias
         csp_value = (
             "default-src 'self'; "
-            "script-src 'self'; "
-            "style-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
-            "connect-src 'self'; "
-            "frame-src 'none'; "
+            "connect-src 'self' http: https:; "
+            "frame-src 'self'; "
             "object-src 'none'; "
             "base-uri 'self';"
         )
