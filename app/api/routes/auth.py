@@ -11,6 +11,9 @@ from starlette.responses import RedirectResponse
 from app.api.deps import get_db
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password, get_password_hash, brute_force_protection
+from app.core.logger import get_logger
+
+logger = get_logger("auth")
 from app.models.user import User
 from app.models.role import Role
 from app.models.user_role import UserRole
@@ -41,6 +44,7 @@ def login_access_token(
     is_locked, unlock_time = brute_force_protection.check_account_status(identifier)
     
     if is_locked:
+        logger.warning(f"Attempt to login to locked account: {identifier}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Account locked due to too many failed attempts. Try again after {unlock_time}",
@@ -61,6 +65,7 @@ def login_access_token(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
+        logger.warning(f"Failed login attempt for user: {identifier}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Incorrect email or password. Attempts remaining: {attempts_remaining}",
@@ -81,8 +86,8 @@ def login_access_token(
         "email": user.email,
         "profile": user.profile_type
     }
-    
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES) 
+    logger.info(f"User {user.email} logged in successfully")
     return {
         "access_token": create_access_token(
             subject=str(user.guid), expires_delta=access_token_expires, user_data=user_data
@@ -93,9 +98,11 @@ def login_access_token(
 @router.post("/register", response_model=Token)
 def register_user(user_in: UserCreate, db: Session = Depends(get_db)) -> Any:
     """Register a new user and return an access token"""
+    logger.info(f"Registration attempt for email: {user_in.email}")
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == user_in.email).first()
     if existing_user:
+        logger.warning(f"Registration failed: Email already exists: {user_in.email}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
@@ -130,6 +137,7 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)) -> Any:
 
     # Create access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    logger.info(f"User registered successfully: {user.email} (ID: {user.id})")
     return {
         "access_token": create_access_token(
             subject=str(user.guid), expires_delta=access_token_expires, user_data=user_data
@@ -193,7 +201,7 @@ async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
         "profile": user.profile_type
     }
     
-    # Create access token
+    # Create access token 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         subject=str(user.guid), expires_delta=access_token_expires, user_data=user_data

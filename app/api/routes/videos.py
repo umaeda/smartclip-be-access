@@ -2,6 +2,9 @@ from typing import List, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from app.core.logger import get_logger
+
+logger = get_logger("videos")
 
 from app.api.deps import get_db, has_permission, get_current_verified_user
 from app.core.exceptions import VideoNotValidatedException
@@ -33,10 +36,13 @@ def create_video(
     db.commit()
     db.refresh(video)
     
+    logger.info(f"Video created: {video.id} by user {current_user.id} - {current_user.email}")
+    
     # Business logic: Raise exception if video is not validated
     # This is just to demonstrate the exception, in a real scenario
     # you might have a validation process before allowing access
     if not video.is_validated:
+        logger.warning(f"Video not validated: {video.id}")
         raise VideoNotValidatedException()
     
     return video
@@ -48,6 +54,7 @@ def get_videos(
     skip: int = 0,
     limit: int = 100
 ) -> Any:
+    logger.info(f"User {current_user.id} - {current_user.email} requested video list (skip={skip}, limit={limit})")
     """Get all videos for the current user"""
     videos = db.query(Video).filter(Video.user_id == current_user.id).offset(skip).limit(limit).all()
     return videos
