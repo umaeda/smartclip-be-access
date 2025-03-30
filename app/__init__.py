@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.routes import api_router
 from app.core.config import settings
 from app.core.logger import app_logger, RequestLoggingMiddleware
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.db.session import engine, SessionLocal
 from app.db.base import Base
 from fastapi.routing import APIRoute
@@ -36,6 +37,9 @@ app.add_middleware(
 
 # Add request logging middleware
 app.add_middleware(RequestLoggingMiddleware)
+
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
 
 for route in app.router.routes:
     app_logger.debug(f"Registered route - Path: {route.path}, Name: {route.name}")
