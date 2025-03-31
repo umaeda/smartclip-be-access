@@ -7,7 +7,7 @@ from app.db.base_class import Base
 class Video(Base):
     title = Column(String, nullable=False, index=True)
     description = Column(String, nullable=True)
-    url = Column(String, nullable=False)
+    url = Column(String, nullable=True)
     is_validated = Column(Boolean, default=False)
     user_id = Column(Integer, ForeignKey("tb_user.id"), nullable=False)
     

@@ -84,6 +84,17 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if any(path.startswith(exempt_route) for exempt_route in CSRF_EXEMPT_ROUTES):
             response = await call_next(request)
+            # Gera e adiciona token CSRF mesmo em rotas isentas
+            new_token = generate_csrf_token()
+            encoded_token = encode_csrf_token(new_token)
+            response.set_cookie(
+                key=CSRF_COOKIE_NAME,
+                value=encoded_token,
+                max_age=CSRF_TOKEN_EXPIRY,
+                httponly=True,
+                samesite="Lax"
+            )
+            response.headers[CSRF_TOKEN_HEADER] = new_token
             return response
         
         # Verifica se o método precisa de proteção CSRF

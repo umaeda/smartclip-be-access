@@ -76,7 +76,8 @@ class Settings(BaseSettings):
     
     # Configurações de logging
     LOG_SENSITIVE_DATA: bool = os.getenv("LOG_SENSITIVE_DATA", "False").lower() == "true"
-    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    # Definindo o nível de log padrão como DEBUG para melhorar a visibilidade dos erros
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "DEBUG")
     
     class Config:
         case_sensitive = True
