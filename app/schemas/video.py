@@ -5,11 +5,13 @@ from pydantic import BaseModel
 class VideoBase(BaseModel):
     title: str
     description: Optional[str] = None
-    url: str
+    url: Optional[str] = None
 
 # Properties to receive via API on creation
 class VideoCreate(VideoBase):
-    pass
+    title: str
+    duration: int
+    url: Optional[str] = None
 
 # Properties to return via API
 class Video(VideoBase):

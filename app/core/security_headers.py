@@ -36,14 +36,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Política ajustada para permitir requisições necessárias
         csp_value = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https://fastapi.tiangolo.com; "
             "font-src 'self'; "
             "connect-src 'self' http: https:; "
             "frame-src 'self'; "
             "object-src 'none'; "
             "base-uri 'self';"
+            "worker-src 'self';"
         )
         response.headers["Content-Security-Policy"] = csp_value
         

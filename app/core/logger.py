@@ -93,9 +93,41 @@ def setup_logger(name: str = "app"):
 app_logger = setup_logger("smartclip")
 
 # Função para obter um logger para um módulo específico
-def get_logger(name: str):
-    """Retorna um logger para um módulo específico"""
-    return logging.getLogger(f"smartclip.{name}")
+class ValidationErrorFilter(logging.Filter):
+    def filter(self, record):
+        return isinstance(record.exc_info[1], ValidationError) if record.exc_info else False
+
+def get_logger(name: str) -> logging.Logger:
+    logger = logging.getLogger(f"smartclip.{name}")
+    logger.setLevel(logging.DEBUG)
+
+    # Formatter padrão
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+    # Handler para erros de validação
+    validation_formatter = logging.Formatter(
+        "%(asctime)s - VALIDATION ERROR - %(levelname)s - \n"
+        "Path: %(request_path)s \n"
+        "Method: %(request_method)s \n"
+        "Body: %(request_body)s \n"
+        "Errors: %(validation_errors)s"
+    )
+    
+    validation_handler = logging.StreamHandler()
+    validation_handler.setLevel(logging.WARNING)
+    validation_handler.setFormatter(validation_formatter)
+    validation_handler.addFilter(ValidationErrorFilter())
+
+    # Handler padrão
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+
+    logger.addHandler(console_handler)
+    logger.addHandler(validation_handler)
+
+    return logger
 
 # Middleware para logging de requisições HTTP
 class RequestLoggingMiddleware:
