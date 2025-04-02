@@ -9,6 +9,10 @@ class VideoServiceException(DomainException):
     """Exceção base para erros relacionados ao serviço de vídeo"""
     pass
 
+class CreditServiceException(DomainException):
+    """Exceção base para erros relacionados ao serviço de créditos"""
+    pass
+
 # Exceções de domínio específicas
 class VideoNotValidatedException(VideoServiceException):
     """Lançada quando um vídeo não foi validado"""
@@ -51,6 +55,25 @@ def map_domain_exception_to_http(exception: DomainException) -> HTTPException:
                 "error_id": exception.error_id
             }
         )
+    # Exceções do serviço de créditos
+    elif hasattr(exception, "__module__") and "credit_service" in exception.__module__:
+        if "InsufficientCreditsException" in exception.__class__.__name__:
+            return HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "code": "insufficient_credits",
+                    "message": exception.detail
+                }
+            )
+        else:
+            return HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "code": "credit_transaction_failed",
+                    "message": exception.detail,
+                    "error_id": getattr(exception, "error_id", None)
+                }
+            )
     else:
         # Exceção de domínio genérica
         return HTTPException(
