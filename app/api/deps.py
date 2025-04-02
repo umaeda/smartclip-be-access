@@ -8,6 +8,7 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.core.security import JWT_ALGORITHM
+from app.core.csrf import csrf_protect
 from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.role import Role
