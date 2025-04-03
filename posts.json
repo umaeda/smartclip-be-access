@@ -1,0 +1,13 @@
+[
+    {
+        "titulo": "Título Exemplo",
+        "roteiro": "Este é o roteiro gerado...",
+        "frases": [
+            "Frase 1",
+            "Frase2"
+        ],
+        "hashtags": "#exemplo #teste",
+        "conteudo": "Conteúdo para legenda...",
+        "data_registro": "2025-04-02T19:12:14.325494"
+    }
+]

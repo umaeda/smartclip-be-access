@@ -1,5 +1,8 @@
 from typing import Optional, Dict, Any
 import uuid
+import os
+import math
+from datetime import datetime
 
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.orm import Session
@@ -11,18 +14,154 @@ from app.core.exceptions import VideoNotValidatedException, VideoGenerationExcep
 from app.core.logger import get_logger
 from app.services.credit_service import consume_credit, refund_credit, InsufficientCreditsException
 
+# Importações para geração de vídeo
+from app.services.genvideo.core.social_post import SistemaPostsAutomaticos
+from app.services.genvideo.gerador_texto import GeradorTexto
+from app.services.genvideo.ag_gerador_imagem import GeradorImagens
+from app.services.genvideo.gerador_narracao import GeradorNarracao
+from app.services.genvideo.ag_editor_video import EditorVideo
+from app.services.genvideo.ag_editor_audio import EditorAudio
+from app.services.genvideo import config
+
+# Configuração do ambiente para o ImageMagick
+os.environ["IMAGEMAGICK_BINARY"] = config.IMAGEMAGICK_BINARY
+
 logger = get_logger("video_service")
 
 
 def generate_video(assunto: str, duracao_segundos: int) -> Optional[str]:
     """
     Gera um vídeo com base no assunto e duração fornecidos.
-    Retorna a URL do vídeo gerado ou None em caso de falha.
+    Retorna o caminho do arquivo de vídeo gerado ou None em caso de falha.
     
-    Esta é uma implementação mockada inicial que sempre retorna uma URL fixa.
+    Args:
+        assunto: Tema ou assunto do vídeo
+        duracao_segundos: Duração desejada do vídeo em segundos
+        
+    Returns:
+        str: Caminho do arquivo de vídeo gerado ou None em caso de falha
     """
-    # TODO: Implementar lógica real de geração de vídeo
-    return "https://example.com/video/mock"
+    try:
+        request_id = str(uuid.uuid4())
+        logger.info(
+            "Iniciando geração de vídeo",
+            extra={
+                "request_id": request_id,
+                "assunto": assunto,
+                "duracao": duracao_segundos,
+                "operation": "generate_video",
+                "component": "video_generation_start",
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+        # Inicializa o sistema de posts automáticos com todos os componentes necessários
+        sistema = SistemaPostsAutomaticos(
+            gerador_texto=GeradorTexto(),
+            gerador_imagens=GeradorImagens(),
+            gerador_narracao=GeradorNarracao(),
+            editor_video=EditorVideo(1080, 720),
+            editor_audio=EditorAudio()
+        )
+        
+        # Calcula a quantidade de imagens com base na duração (1 imagem a cada 10 segundos)
+        qtd_imagens = math.ceil(duracao_segundos / 10)
+        
+        # Executa o fluxo de geração de vídeo
+        # Importante: o identificador não é usado pelo sistema de geração de vídeos
+        # O sistema gera seu próprio identificador internamente
+        arquivo_video = sistema.executar_fluxo(
+            tema=assunto, 
+            modelo='gemini',  # Modelo padrão para geração de texto
+            duracao=duracao_segundos, 
+            qtd_imagens=qtd_imagens
+        )
+        
+        try:
+            # Carrega os dados do último registro salvo
+            # O sistema de geração de vídeos salva os dados no arquivo dados.json
+            from app.services.genvideo.save_data import load_data_from_json
+            dados = load_data_from_json()
+            print(arquivo_video)
+            if dados and len(dados) > 0:
+                # Pega o último registro salvo (o mais recente)
+                post_data = dados[-1]
+                arquivo_video = post_data["arquivo_video"]
+                
+                # Garante que o caminho é absoluto
+                arquivo_video = os.path.abspath(arquivo_video)
+                
+                logger.info(
+                    "Vídeo gerado com sucesso",
+                    extra={
+                        "request_id": request_id,
+                        "assunto": assunto,
+                        "duracao": duracao_segundos,
+                        "arquivo_video": arquivo_video,
+                        "operation": "generate_video",
+                        "component": "video_generation_complete",
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+                
+                return arquivo_video
+            else:
+                error_id = str(uuid.uuid4())
+                logger.error(
+                    "Nenhum registro de vídeo encontrado após geração",
+                    extra={
+                        "request_id": request_id,
+                        "error_id": error_id,
+                        "assunto": assunto,
+                        "duracao": duracao_segundos,
+                        "operation": "generate_video",
+                        "component": "video_data_validation",
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+                return None
+        except Exception as e:
+            import traceback
+            error_stack = traceback.format_exc()
+            error_id = str(uuid.uuid4())
+            
+            logger.error(
+                "Erro ao recuperar dados do vídeo gerado",
+                extra={
+                    "request_id": request_id,
+                    "error_id": error_id,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "error_stack": error_stack,
+                    "assunto": assunto,
+                    "duracao": duracao_segundos,
+                    "operation": "generate_video",
+                    "component": "video_data_retrieval",
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+            return None
+    except Exception as e:
+        import traceback
+        error_stack = traceback.format_exc()
+        error_id = str(uuid.uuid4())
+        
+        logger.error(
+            "Erro ao gerar vídeo",
+            extra={
+                "request_id": request_id,
+                "error_id": error_id,
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "error_stack": error_stack,
+                "assunto": assunto,
+                "duracao": duracao_segundos,
+                "operation": "generate_video",
+                "component": "video_generation",
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        return None
 
 
 def create_video(db: Session, video_in: VideoCreate, current_user: User) -> Video:
@@ -162,17 +301,22 @@ def create_video(db: Session, video_in: VideoCreate, current_user: User) -> Vide
         # Propaga a exceção de créditos insuficientes sem modificá-la
         raise
     except Exception as e:
+        import traceback
+        error_stack = traceback.format_exc()
         error_id = str(uuid.uuid4())
         logger.error(
             "Erro interno ao processar vídeo",
             extra={
                 "error_type": type(e).__name__,
                 "error_message": str(e),
+                "error_stack": error_stack,
                 "error_id": error_id,
                 "user_id": current_user.id,
                 "video_title": video_in.title,
                 "video_duration": video_in.duration,
-                "operation": "create_video"
+                "operation": "create_video",
+                "component": "video_creation",
+                "timestamp": datetime.now().isoformat()
             }
         )
         raise VideoGenerationException(

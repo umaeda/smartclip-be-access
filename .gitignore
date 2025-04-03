@@ -47,3 +47,8 @@ logs/
 
 # Local development settings
 .DS_Store
+*.mp4
+client_secret.json
+dados.json
+imagens/*
+narracao/*

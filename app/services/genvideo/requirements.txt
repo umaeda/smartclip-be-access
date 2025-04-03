@@ -1,0 +1,9 @@
+requests~=2.32.3
+moviepy==2.1.2
+google-api-python-client~=2.163.0
+google-auth-oauthlib~=1.2.1
+langchain==0.3.20
+langchain-community==0.3.19
+langchain-google-genai==2.0.11
+protobuf~=5.29.3
+pillow~=10.4.0

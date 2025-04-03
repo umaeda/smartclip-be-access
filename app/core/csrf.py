@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 CSRF_SECRET = settings.SECRET_KEY  # Usando a mesma chave secreta do JWT
 CSRF_TOKEN_HEADER = "X-CSRF-Token"
 CSRF_COOKIE_NAME = "csrf_token"
-CSRF_TOKEN_EXPIRY = 3600  # 1 hora em segundos
+CSRF_TOKEN_EXPIRY = 36000  # 1 hora em segundos
 
 # Métodos que modificam dados e precisam de proteção CSRF
 CSRF_PROTECTED_METHODS = ["POST", "PUT", "DELETE", "PATCH"]
