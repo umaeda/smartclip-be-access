@@ -29,20 +29,22 @@ os.environ["IMAGEMAGICK_BINARY"] = config.IMAGEMAGICK_BINARY
 logger = get_logger("video_service")
 
 
-def generate_video(assunto: str, duracao_segundos: int) -> Optional[str]:
+def generate_video(assunto: str, duracao_segundos: int) -> Optional[Dict[str, Any]]:
     """
     Gera um vídeo com base no assunto e duração fornecidos.
-    Retorna o caminho do arquivo de vídeo gerado ou None em caso de falha.
+    Retorna um dicionário com informações do vídeo gerado ou None em caso de falha.
     
     Args:
         assunto: Tema ou assunto do vídeo
         duracao_segundos: Duração desejada do vídeo em segundos
         
     Returns:
-        str: Caminho do arquivo de vídeo gerado ou None em caso de falha
+        Dict[str, Any]: Dicionário com informações do vídeo gerado ou None em caso de falha
     """
     try:
         request_id = str(uuid.uuid4())
+        start_time = datetime.now()
+        
         logger.info(
             "Iniciando geração de vídeo",
             extra={
@@ -51,7 +53,7 @@ def generate_video(assunto: str, duracao_segundos: int) -> Optional[str]:
                 "duracao": duracao_segundos,
                 "operation": "generate_video",
                 "component": "video_generation_start",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": start_time.isoformat()
             }
         )
         
@@ -91,6 +93,10 @@ def generate_video(assunto: str, duracao_segundos: int) -> Optional[str]:
                 # Garante que o caminho é absoluto
                 arquivo_video = os.path.abspath(arquivo_video)
                 
+                # Calcula o tempo de geração em segundos
+                end_time = datetime.now()
+                generation_time = (end_time - start_time).total_seconds()
+                
                 logger.info(
                     "Vídeo gerado com sucesso",
                     extra={
@@ -98,13 +104,20 @@ def generate_video(assunto: str, duracao_segundos: int) -> Optional[str]:
                         "assunto": assunto,
                         "duracao": duracao_segundos,
                         "arquivo_video": arquivo_video,
+                        "tempo_geracao": generation_time,
                         "operation": "generate_video",
                         "component": "video_generation_complete",
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": end_time.isoformat()
                     }
                 )
                 
-                return arquivo_video
+                # Retorna um dicionário com as informações do vídeo
+                return {
+                    "url": arquivo_video,
+                    "duration": duracao_segundos,
+                    "generation_time": generation_time,
+                    "post_data": post_data  # Inclui os dados completos do post
+                }
             else:
                 error_id = str(uuid.uuid4())
                 logger.error(
@@ -208,15 +221,34 @@ def create_video(db: Session, video_in: VideoCreate, current_user: User) -> Vide
             
             try:
                 # Gera o vídeo usando o serviço
-                video_url = generate_video(video_in.title, video_in.duration)
+                video_result = generate_video(video_in.title, video_in.duration)
                 
-                # Create video object
+                if not video_result:
+                    raise VideoGenerationException(detail="Falha na geração do vídeo")
+                
+                # Create video object com as informações adicionais
+                # Extrai os dados do post_data para salvar no banco de dados
+                post_data = video_result.get("post_data", {})
+                
                 video = Video(
                     title=video_in.title,
                     description=video_in.description,
-                    url=video_url,
+                    url=video_result["url"],
                     is_validated=True,
-                    user_id=current_user.id
+                    user_id=current_user.id,
+                    duration=video_result["duration"],
+                    generation_time=video_result["generation_time"],
+                    # Campos adicionais do vídeo
+                    solicitacao=post_data.get("solicitacao"),
+                    roteiro=post_data.get("roteiro"),
+                    frases=post_data.get("frases"),
+                    hashtags=post_data.get("hashtags"),
+                    conteudo=post_data.get("conteudo"),
+                    imagens=post_data.get("imagens"),
+                    narracao_marcada=post_data.get("narracao_marcada"),
+                    arquivo_narracao_raw=post_data.get("arquivo_narracao_raw"),
+                    arquivo_narracao_remix=post_data.get("arquivo_narracao_remix"),
+                    arquivo_video=post_data.get("arquivo_video")
                 )
                 
                 db.add(video)
@@ -304,21 +336,52 @@ def create_video(db: Session, video_in: VideoCreate, current_user: User) -> Vide
         import traceback
         error_stack = traceback.format_exc()
         error_id = str(uuid.uuid4())
+        
+        # Preparando informações de log que são seguras de acessar
+        log_extra = {
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+            "error_stack": error_stack,
+            "error_id": error_id,
+            "user_id": current_user.id,
+            "operation": "create_video",
+            "component": "video_creation",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Adiciona informações do vídeo se disponíveis
+        if video_in:
+            log_extra["video_title"] = video_in.title
+            log_extra["video_duration"] = video_in.duration
+        
         logger.error(
             "Erro interno ao processar vídeo",
-            extra={
-                "error_type": type(e).__name__,
-                "error_message": str(e),
-                "error_stack": error_stack,
-                "error_id": error_id,
-                "user_id": current_user.id,
-                "video_title": video_in.title,
-                "video_duration": video_in.duration,
-                "operation": "create_video",
-                "component": "video_creation",
-                "timestamp": datetime.now().isoformat()
-            }
+            extra=log_extra
         )
+        
+        # Se o crédito foi consumido, tenta estornar
+        if credit_consumed and transaction_id:
+            try:
+                refund_credit(db, current_user.id, description="Estorno por erro interno na geração de vídeo")
+                logger.info(
+                    "Crédito estornado por erro interno",
+                    extra={
+                        "user_id": current_user.id,
+                        "transaction_id": transaction_id,
+                        "operation": "refund_credit"
+                    }
+                )
+            except Exception as refund_error:
+                logger.error(
+                    "Falha ao estornar crédito após erro interno",
+                    extra={
+                        "user_id": current_user.id,
+                        "transaction_id": transaction_id,
+                        "error_message": str(refund_error),
+                        "operation": "refund_credit_failed"
+                    }
+                )
+        
         raise VideoGenerationException(
             detail="Falha na geração do vídeo",
             error_id=error_id

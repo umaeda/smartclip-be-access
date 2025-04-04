@@ -2,8 +2,10 @@ import logging
 import sys
 import os
 import re
+import json
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from pydantic import ValidationError
 
 from app.core.config import settings
 
@@ -37,6 +39,27 @@ def sanitize_log_message(message):
     return message
 
 # Configuração do logger
+# Formato do log com suporte a campos extras
+# Definido no escopo global para ser acessível em todas as funções
+class ExtendedFormatter(logging.Formatter):
+    def format(self, record):
+        # Formato base
+        formatted_msg = super().format(record)
+        
+        # Adicionar campos extras se existirem
+        extra_fields = ""
+        for key, value in record.__dict__.items():
+            if key not in ["args", "asctime", "created", "exc_info", "exc_text", 
+                          "filename", "funcName", "levelname", "levelno", 
+                          "lineno", "module", "msecs", "message", "msg", 
+                          "name", "pathname", "process", "processName", 
+                          "relativeCreated", "stack_info", "thread", "threadName"]:
+                extra_fields += f"\n    {key}: {value}"
+        
+        if extra_fields:
+            return f"{formatted_msg}{extra_fields}"
+        return formatted_msg
+
 # Criar uma classe de filtro para sanitizar mensagens de log
 class SensitiveDataFilter(logging.Filter):
     """Filtro para sanitizar informações sensíveis em logs"""
@@ -66,8 +89,8 @@ def setup_logger(name: str = "app"):
     # Adicionar filtro para sanitizar dados sensíveis apenas se configurado
     logger.addFilter(SensitiveDataFilter(not settings.LOG_SENSITIVE_DATA))
     
-    # Formato do log
-    log_format = logging.Formatter(
+    # Usar o formatador estendido para logs
+    log_format = ExtendedFormatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
@@ -96,23 +119,37 @@ app_logger = setup_logger("smartclip")
 class ValidationErrorFilter(logging.Filter):
     def filter(self, record):
         return isinstance(record.exc_info[1], ValidationError) if record.exc_info else False
+        
+    def __call__(self, record):
+        # Garantir que o método filter seja chamado
+        return self.filter(record)
 
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(f"smartclip.{name}")
     logger.setLevel(logging.DEBUG)
 
-    # Formatter padrão
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    # Formatter padrão usando o ExtendedFormatter
+    formatter = ExtendedFormatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     # Handler para erros de validação
-    validation_formatter = logging.Formatter(
-        "%(asctime)s - VALIDATION ERROR - %(levelname)s - \n"
-        "Path: %(request_path)s \n"
-        "Method: %(request_method)s \n"
-        "Body: %(request_body)s \n"
-        "Errors: %(validation_errors)s"
+    # Mantém o formato específico para erros de validação
+    class ValidationFormatter(logging.Formatter):
+        def format(self, record):
+            # Formato base para erros de validação
+            if hasattr(record, 'validation_errors'):
+                return f"{record.asctime} - VALIDATION ERROR - {record.levelname} - \n" \
+                       f"Path: {getattr(record, 'request_path', 'N/A')} \n" \
+                       f"Method: {getattr(record, 'request_method', 'N/A')} \n" \
+                       f"Body: {getattr(record, 'request_body', 'N/A')} \n" \
+                       f"Errors: {getattr(record, 'validation_errors', 'N/A')}"
+            return super().format(record)
+    
+    validation_formatter = ValidationFormatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
     )
     
     validation_handler = logging.StreamHandler()

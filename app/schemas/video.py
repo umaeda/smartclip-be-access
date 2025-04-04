@@ -18,6 +18,8 @@ class Video(VideoBase):
     id: int
     is_validated: bool
     user_id: int
+    duration: Optional[int] = None
+    generation_time: Optional[float] = None
     
     class Config:
         from_attributes = True
