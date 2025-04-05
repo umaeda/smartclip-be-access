@@ -219,92 +219,140 @@ def create_video(db: Session, video_in: VideoCreate, current_user: User) -> Vide
                 }
             )
             
-            try:
-                # Gera o vídeo usando o serviço
+            # Gera o vídeo usando o serviço
+            if 1 == 2:
+                from app.services.mock_data import mock_video_data
+                video_result = mock_video_data("assunto", 10)
+            else:
                 video_result = generate_video(video_in.title, video_in.duration)
                 
                 if not video_result:
                     raise VideoGenerationException(detail="Falha na geração do vídeo")
                 
-                # Create video object com as informações adicionais
-                # Extrai os dados do post_data para salvar no banco de dados
-                post_data = video_result.get("post_data", {})
+            # Create video object com as informações adicionais
+            # Extrai os dados do post_data para salvar no banco de dados
+            post_data = video_result.get("post_data", {})
+            
+            # Cria o objeto de vídeo com os dados básicos
+            video = Video(
+                title=video_in.title,
+                description=video_in.description,
+                url=video_result["url"],  # URL local temporária
+                is_validated=True,
+                user_id=current_user.id,
+                duration=video_result["duration"],
+                generation_time=video_result["generation_time"],
+                # Campos adicionais do vídeo
+                solicitacao=post_data.get("solicitacao"),
+                roteiro=post_data.get("roteiro"),
+                frases=post_data.get("frases"),
+                hashtags=post_data.get("hashtags"),
+                conteudo=post_data.get("conteudo"),
+                imagens=post_data.get("imagens"),
+                narracao_marcada=post_data.get("narracao_marcada"),
+                arquivo_narracao_raw=post_data.get("arquivo_narracao_raw"),
+                arquivo_narracao_remix=post_data.get("arquivo_narracao_remix"),
+                arquivo_video=post_data.get("arquivo_video")
+            )
+            
+            # Salva o vídeo no banco de dados para obter o ID
+            db.add(video)
+            db.commit()
+            db.refresh(video)
+            
+            # Faz upload do vídeo para o Azure Blob Storage
+            from app.services.storage_service import upload_video_to_blob_storage
+            
+            # Obtém o caminho do arquivo de vídeo
+            arquivo_video_path = post_data.get("arquivo_video")
+            if arquivo_video_path and os.path.exists(arquivo_video_path):
+                # Faz upload do vídeo para o Azure Blob Storage
+                blob_url = upload_video_to_blob_storage(arquivo_video_path, video.id)
                 
-                video = Video(
-                    title=video_in.title,
-                    description=video_in.description,
-                    url=video_result["url"],
-                    is_validated=True,
-                    user_id=current_user.id,
-                    duration=video_result["duration"],
-                    generation_time=video_result["generation_time"],
-                    # Campos adicionais do vídeo
-                    solicitacao=post_data.get("solicitacao"),
-                    roteiro=post_data.get("roteiro"),
-                    frases=post_data.get("frases"),
-                    hashtags=post_data.get("hashtags"),
-                    conteudo=post_data.get("conteudo"),
-                    imagens=post_data.get("imagens"),
-                    narracao_marcada=post_data.get("narracao_marcada"),
-                    arquivo_narracao_raw=post_data.get("arquivo_narracao_raw"),
-                    arquivo_narracao_remix=post_data.get("arquivo_narracao_remix"),
-                    arquivo_video=post_data.get("arquivo_video")
-                )
-                
-                db.add(video)
-                db.commit()
-                db.refresh(video)
-                
-                logger.info(
-                    "Video criado com sucesso",
+                if blob_url:
+                    # Atualiza a URL do vídeo no banco de dados com a URL do blob
+                    video.url = blob_url
+                    db.commit()
+                    db.refresh(video)
+                    
+                    logger.info(
+                        "URL do vídeo atualizada com a URL do blob",
+                        extra={
+                            "video_id": video.id,
+                            "user_id": current_user.id,
+                            "operation": "upload_video_to_blob"
+                        }
+                    )
+                else:
+                    logger.warning(
+                        "Falha ao fazer upload do vídeo para o Azure Blob Storage",
+                        extra={
+                            "video_id": video.id,
+                            "user_id": current_user.id,
+                            "operation": "upload_video_to_blob_failed"
+                        }
+                    )
+            else:
+                logger.warning(
+                    "Arquivo de vídeo não encontrado para upload",
                     extra={
                         "video_id": video.id,
+                        "arquivo_video_path": arquivo_video_path,
                         "user_id": current_user.id,
-                        "user_email": current_user.email,
-                        "video_title": video.title,
-                        "operation": "create_video"
+                        "operation": "upload_video_to_blob_file_not_found"
                     }
                 )
             
-                # Business logic: Raise exception if video is not validated
-                if not video.is_validated:
-                    logger.warning(
-                        "Video não validado",
-                        extra={
-                            "video_id": video.id,
-                            "validation_status": video.is_validated,
-                            "user_id": current_user.id,
-                            "operation": "video_validation"
-                        }
-                    )
-                    # Estorna o crédito se o vídeo não for validado
-                    refund_credit(db, current_user.id, description=f"Estorno por vídeo não validado (ID: {video.id})")
-                    logger.info(
-                        "Crédito estornado por vídeo não validado",
-                        extra={
-                            "user_id": current_user.id,
-                            "video_id": video.id,
-                            "operation": "refund_credit"
-                        }
-                    )
-                    # Marca que o crédito já foi estornado para evitar estorno duplo
-                    credit_consumed = False
-                    raise VideoNotValidatedException()
-                    
-            except Exception as video_error:
-                # Se ocorrer um erro na geração do vídeo após o consumo do crédito, estorna o crédito
-                if credit_consumed:
-                    refund_credit(db, current_user.id, description="Estorno por falha na geração de vídeo")
-                    logger.info(
-                        "Crédito estornado por falha na geração de vídeo",
-                        extra={
-                            "user_id": current_user.id,
-                            "transaction_id": transaction_id,
-                            "operation": "refund_credit"
-                        }
-                    )
-                # Re-lança a exceção original
-                raise video_error
+            logger.info(
+                "Video criado com sucesso",
+                extra={
+                    "video_id": video.id,
+                    "user_id": current_user.id,
+                    "user_email": current_user.email,
+                    "video_title": video.title,
+                    "operation": "create_video"
+                }
+            )
+        
+            # Business logic: Raise exception if video is not validated
+            if not video.is_validated:
+                logger.warning(
+                    "Video não validado",
+                    extra={
+                        "video_id": video.id,
+                        "validation_status": video.is_validated,
+                        "user_id": current_user.id,
+                        "operation": "video_validation"
+                    }
+                )
+                # Estorna o crédito se o vídeo não for validado
+                refund_credit(db, current_user.id, description=f"Estorno por vídeo não validado (ID: {video.id})")
+                logger.info(
+                    "Crédito estornado por vídeo não validado",
+                    extra={
+                        "user_id": current_user.id,
+                        "video_id": video.id,
+                        "operation": "refund_credit"
+                    }
+                )
+                # Marca que o crédito já foi estornado para evitar estorno duplo
+                credit_consumed = False
+                raise VideoNotValidatedException()
+                
+        except Exception as video_error:
+            # Se ocorrer um erro na geração do vídeo após o consumo do crédito, estorna o crédito
+            if credit_consumed:
+                refund_credit(db, current_user.id, description="Estorno por falha na geração de vídeo")
+                logger.info(
+                    "Crédito estornado por falha na geração de vídeo",
+                    extra={
+                        "user_id": current_user.id,
+                        "transaction_id": transaction_id,
+                        "operation": "refund_credit"
+                    }
+                )
+            # Re-lança a exceção original
+            raise video_error
                 
         except InsufficientCreditsException as e:
             logger.warning(
@@ -386,3 +434,92 @@ def create_video(db: Session, video_in: VideoCreate, current_user: User) -> Vide
             detail="Falha na geração do vídeo",
             error_id=error_id
         )
+
+
+def get_video_download_url(db: Session, video_guid: str, user_id: int) -> Optional[str]:
+    """
+    Gera uma URL de download para um vídeo específico
+    
+    Args:
+        db: Sessão do banco de dados
+        video_guid: GUID do vídeo
+        user_id: ID do usuário que está solicitando o download
+        
+    Returns:
+        Optional[str]: URL de download do vídeo ou None se não for encontrado
+        
+    Raises:
+        Exception: Se ocorrer um erro ao gerar a URL de download
+    """
+    try:
+        # Busca o vídeo pelo GUID e usuário
+        video = db.query(Video).filter(Video.guid == video_guid, Video.user_id == user_id).first()
+        
+        if not video:
+            return None
+        
+        # Verifica se o vídeo tem uma URL do blob storage
+        if not video.url or not video.url.startswith("https://"):
+            return None
+        
+        # Gera uma URL de download temporária
+        from app.services.storage_service import generate_download_url
+        download_url = generate_download_url(video.url, video.id)
+        
+        return download_url
+    except Exception as e:
+        logger.error(
+            "Erro ao gerar URL de download para vídeo",
+            extra={
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "video_guid": video_guid,
+                "user_id": user_id,
+                "operation": "get_video_download_url"
+            }
+        )
+        return None
+
+
+def get_video_streaming_url(db: Session, video_guid: str, user_id: int) -> Optional[str]:
+    """Gera uma URL de streaming para um vídeo específico
+    
+    Args:
+        db: Sessão do banco de dados
+        video_guid: GUID do vídeo
+        user_id: ID do usuário que está solicitando o streaming
+        
+    Returns:
+        Optional[str]: URL de streaming do vídeo ou None se não for encontrado
+        
+    Raises:
+        Exception: Se ocorrer um erro ao gerar a URL de streaming
+    """
+    try:
+        # Busca o vídeo pelo GUID e usuário
+        video = db.query(Video).filter(Video.guid == video_guid, Video.user_id == user_id).first()
+        
+        if not video:
+            return None
+        
+        # Verifica se o vídeo tem uma URL do blob storage
+        if not video.url or not video.url.startswith("https://"):
+            return None
+        
+        # Gera uma URL de streaming temporária
+        from app.services.storage_service import generate_streaming_url
+        streaming_url = generate_streaming_url(video.url, video.id)
+        
+        return streaming_url
+    except Exception as e:
+        logger.error(
+            "Erro ao gerar URL de streaming para vídeo",
+            extra={
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "video_guid": video_guid,
+                "user_id": user_id,
+                "operation": "get_video_streaming_url"
+            }
+        )
+        return None

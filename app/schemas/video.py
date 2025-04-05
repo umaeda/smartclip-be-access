@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID4
 
 # Shared properties
 class VideoBase(BaseModel):
@@ -16,6 +16,7 @@ class VideoCreate(VideoBase):
 # Properties to return via API
 class Video(VideoBase):
     id: int
+    guid: UUID4  # Campo guid como UUID4 para compatibilidade com o modelo de dados
     is_validated: bool
     user_id: int
     duration: Optional[int] = None

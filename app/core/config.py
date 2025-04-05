@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     # Obtém a chave secreta das variáveis de ambiente
     # Gera uma chave aleatória apenas para desenvolvimento se não estiver definida
     SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
+    
+    # Azure Blob Storage settings
+    AZURE_STORAGE_CONNECTION_STRING: str = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
+    AZURE_STORAGE_CONTAINER_NAME: str = os.getenv("AZURE_STORAGE_CONTAINER_NAME", "videos")
 
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24 * 8))

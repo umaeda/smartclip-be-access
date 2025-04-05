@@ -279,9 +279,13 @@ def get_videos(
             }
         )
         
+        # Converte os objetos Video do SQLAlchemy para o schema VideoSchema antes de retornar
+        # Usando o método correto para Pydantic v2
+        video_schemas = [VideoSchema.model_validate(video, from_attributes=True) for video in videos]
+        
         # Retorna os resultados com metadados de paginação
         return {
-            "items": videos,
+            "items": video_schemas,
             "pagination": {
                 "total": total_count,
                 "page": current_page,
@@ -319,14 +323,14 @@ def get_videos(
 def get_video(
     *,
     db: Session = Depends(get_db),
-    video_id: int,
+    video_id: str,
     current_user: User = Depends(get_current_verified_user)
 ) -> Any:
-    """Obtém um vídeo específico pelo ID
+    """Obtém um vídeo específico pelo ID ou UID
     
     Args:
         db: Sessão do banco de dados
-        video_id: ID do vídeo a ser obtido
+        video_id: ID ou UID do vídeo a ser obtido
         current_user: Usuário autenticado atual
         
     Returns:
@@ -340,7 +344,7 @@ def get_video(
     user_email = getattr(current_user, 'email', None)
     
     logger.info(
-        "Buscando vídeo por ID",
+        "Buscando vídeo por ID ou UID",
         extra={
             "request_id": request_id,
             "video_id": video_id,
@@ -354,7 +358,13 @@ def get_video(
         current_user = db.merge(current_user)
         db.refresh(current_user)
         
-        video = db.query(Video).filter(Video.id == video_id, Video.user_id == current_user.id).first()
+        # Tenta converter para inteiro para compatibilidade com IDs numéricos
+        try:
+            numeric_id = int(video_id)
+            video = db.query(Video).filter(Video.id == numeric_id, Video.user_id == current_user.id).first()
+        except ValueError:
+            # Se não for um número, assume que é um UID
+            video = db.query(Video).filter(Video.uid == video_id, Video.user_id == current_user.id).first()
         if not video:
             logger.warning(
                 "Vídeo não encontrado",
@@ -402,6 +412,135 @@ def get_video(
                 "user_id": user_id,
                 "user_email": user_email,
                 "operation": "get_video_unhandled_error"
+            }
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "code": "internal_server_error",
+                "message": "Erro interno do servidor",
+                "error_id": error_id
+            }
+        )
+
+
+@router.get("/download/{video_guid}")
+def download_video(
+    *,
+    db: Session = Depends(get_db),
+    video_guid: str,
+    current_user: User = Depends(get_current_verified_user)
+) -> Any:
+    """Gera um link de download para um vídeo específico
+    
+    Args:
+        db: Sessão do banco de dados
+        video_guid: UID do vídeo a ser baixado
+        current_user: Usuário autenticado atual
+        
+    Returns:
+        Um objeto com a URL de download do vídeo
+        
+    Raises:
+        HTTPException: Quando o vídeo não é encontrado ou ocorre outro erro
+    """
+    request_id = str(uuid.uuid4())
+    user_id = getattr(current_user, 'id', None)
+    user_email = getattr(current_user, 'email', None)
+    
+    logger.info(
+        "Gerando link de download para vídeo",
+        extra={
+            "request_id": request_id,
+            "video_guid": video_guid,
+            "user_id": user_id,
+            "operation": "download_video"
+        }
+    )
+    
+    try:
+        # Recarrega o usuário da sessão para garantir que os atributos estejam atualizados
+        current_user = db.merge(current_user)
+        db.refresh(current_user)
+        
+        # Verifica se o vídeo existe e pertence ao usuário atual
+        video = db.query(Video).filter(Video.guid == video_guid, Video.user_id == current_user.id).first()
+        if not video:
+            logger.warning(
+                "Vídeo não encontrado para download",
+                extra={
+                    "request_id": request_id,
+                    "video_guid": video_guid,
+                    "user_id": user_id,
+                    "operation": "download_video_not_found"
+                }
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "video_not_found",
+                    "message": "Vídeo não encontrado"
+                }
+            )
+        
+        # Importa o serviço de vídeo para gerar a URL de download
+        from app.services.video_service import get_video_download_url
+        
+        # Gera a URL de download
+        download_url = get_video_download_url(db, video_guid, current_user.id)
+        
+        if not download_url:
+            logger.warning(
+                "Não foi possível gerar URL de download para o vídeo",
+                extra={
+                    "request_id": request_id,
+                    "video_guid": video_guid,
+                    "user_id": user_id,
+                    "operation": "download_video_url_generation_failed"
+                }
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "download_url_generation_failed",
+                    "message": "Não foi possível gerar o link de download para este vídeo"
+                }
+            )
+        
+        logger.info(
+            "URL de download gerada com sucesso",
+            extra={
+                "request_id": request_id,
+                "video_guid": video_guid,
+                "user_id": user_id,
+                "operation": "download_video_success"
+            }
+        )
+        
+        # Retorna a URL de download
+        return {
+            "download_url": download_url,
+            "expires_in": "24 horas"
+        }
+    except HTTPException:
+        # Re-lança exceções HTTP já tratadas
+        raise
+    except Exception as e:
+        # Tratamento genérico para outros erros não esperados
+        error_id = str(uuid.uuid4())
+        error_stack = traceback.format_exc()
+        logger.error(
+            "Erro não tratado ao gerar link de download",
+            extra={
+                "request_id": request_id,
+                "error_id": error_id,
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "error_stack": error_stack,
+                "video_guid": video_guid,
+                "user_id": user_id,
+                "user_email": user_email,
+                "operation": "download_video_unhandled_error"
             }
         )
         raise HTTPException(
