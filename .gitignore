@@ -52,3 +52,4 @@ client_secret.json
 dados.json
 imagens/*
 narracao/*
+app/services/genvideo/token.json
