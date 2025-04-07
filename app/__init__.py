@@ -1,9 +1,12 @@
+import azure.functions as func
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.orm import Session
+import os
 
-from app.api.routes import api_router
+
 from app.core.config import settings
 from app.core.logger import app_logger, RequestLoggingMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
@@ -13,16 +16,22 @@ from app.db.base import Base
 from fastapi.routing import APIRoute
 from fastapi.exceptions import RequestValidationError
 
+# Módulo de configuração do Azure Application Insights removido
+
 # Create database tables
 # Comentar esta linha para produção, pois o Azure Functions não deve criar tabelas automaticamente
 # Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="FastAPI backend with JWT authentication and role-based access control",
+    description="Smartclip backend with JWT authentication and role-based access control",
     version="0.1.0",
     openapi_url=f"{settings.API_STR}/openapi.json"
 )
+
+# Importar e incluir o router principal
+from app.api.routes import api_router
+
 
 # Set up CORS middleware
 origins = [str(origin) for origin in settings.BACKEND_CORS_ORIGINS]
@@ -42,11 +51,19 @@ app.add_middleware(
 # Add CSRF protection middleware
 app.add_middleware(CSRFMiddleware)
 
+# Include main API router
+from app.api.routes import api_router
+app.include_router(api_router, prefix=settings.API_STR)
+
 # Add request logging middleware
 app.add_middleware(RequestLoggingMiddleware)
 
 # Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
+
+# Configuração do Azure Application Insights removida
+if os.getenv("FUNCTIONS_WORKER_RUNTIME"):
+    app_logger.info("Ambiente Azure Functions detectado")
 
 for route in app.router.routes:
     app_logger.debug(f"Registered route - Path: {route.path}, Name: {route.name}")
@@ -59,8 +76,8 @@ def get_db():
     finally:
         db.close()
 
-# Include API router
-app.include_router(api_router, prefix=settings.API_STR)
+# Importar e registrar o router principal
+from app.api.routes import api_router
 
 # Log application startup
 app_logger.info(f"Application {settings.PROJECT_NAME} initialized with API at {settings.API_STR}")

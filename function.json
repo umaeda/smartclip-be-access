@@ -1,11 +1,20 @@
 {
+  "scriptFile": "function_app.py",
   "bindings": [
     {
       "authLevel": "anonymous",
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["get", "post"]
+      "methods": [
+        "get",
+        "post",
+        "put",
+        "delete",
+        "patch",
+        "options"
+      ],
+      "route": "{*route}"
     },
     {
       "type": "http",
