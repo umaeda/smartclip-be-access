@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from app.api.routes.auth import router as auth_router
 from app.api.routes.videos import router as videos_router
 from app.api.routes.credits import router as credits_router
+from app.api.routes.credits import router as credits_router
 from app.api.routes.assistir import router as assistir_router
 
 api_router = APIRouter()
