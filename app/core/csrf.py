@@ -97,6 +97,18 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             response.headers[CSRF_TOKEN_HEADER] = new_token
             return response
         
+        # Verifica se a requisição vem de um dispositivo móvel
+        user_agent = request.headers.get("user-agent", "")
+        is_mobile = any(mobile_identifier in user_agent.lower() for mobile_identifier in [
+            "android", "iphone", "ipad", "ipod", "windows phone", "blackberry", "mobile", "mobi"
+        ])
+        
+        # Se for um dispositivo móvel, ignora a verificação CSRF
+        if is_mobile:
+            logger.info(f"Requisição de dispositivo móvel detectada, ignorando verificação CSRF para {request.url.path}")
+            response = await call_next(request)
+            return response
+        
         # Verifica se o método precisa de proteção CSRF
         if request.method in CSRF_PROTECTED_METHODS:
             # Obtém o token CSRF do cabeçalho
@@ -146,6 +158,17 @@ def csrf_protect():
     Dependência para proteção CSRF em rotas específicas
     """
     def csrf_dependency(request: Request, csrf_cookie_token: str = Depends(csrf_cookie)):
+        # Verifica se a requisição vem de um dispositivo móvel
+        user_agent = request.headers.get("user-agent", "")
+        is_mobile = any(mobile_identifier in user_agent.lower() for mobile_identifier in [
+            "android", "iphone", "ipad", "ipod", "windows phone", "blackberry", "mobile", "mobi"
+        ])
+        
+        # Se for um dispositivo móvel, ignora a verificação CSRF
+        if is_mobile:
+            logger.info(f"Requisição de dispositivo móvel detectada, ignorando verificação CSRF para {request.url.path}")
+            return
+            
         if request.method in CSRF_PROTECTED_METHODS:
             csrf_header_token = request.headers.get(CSRF_TOKEN_HEADER)
             

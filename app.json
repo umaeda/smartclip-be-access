@@ -1,0 +1,12 @@
+{
+  "name": "smartclip-be",
+  "description": "Backend da aplicação SmartClip",
+  "buildpacks": [
+    {
+      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
+    },
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-python.git"
+    }
+  ]
+}
