@@ -33,19 +33,28 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         
         # Define política de segurança de conteúdo (CSP)
-        # Política ajustada para permitir requisições necessárias
+        # Política ajustada para permitir requisições necessárias e acesso mobile
         csp_value = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "img-src 'self' data: https://fastapi.tiangolo.com; "
             "font-src 'self'; "
-            "connect-src 'self' http: https:; "
+            "connect-src 'self' http: https: *; "
             "frame-src 'self'; "
             "object-src 'none'; "
             "base-uri 'self';"
             "worker-src 'self';"
         )
+        
+        # Verifica se a requisição vem de um dispositivo móvel
+        user_agent = request.headers.get("user-agent", "")
+        from app.services.genvideo import is_mobile_device
+        
+        # Se for um dispositivo móvel, usa uma política CSP mais permissiva
+        if is_mobile_device(user_agent):
+            csp_value = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;"
+            
         response.headers["Content-Security-Policy"] = csp_value
         
         # Previne que o navegador armazene dados sensíveis em cache
