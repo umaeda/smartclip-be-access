@@ -3,6 +3,9 @@
   "description": "Backend da aplicação SmartClip",
   "buildpacks": [
     {
+      "url": "https://github.com/heroku/heroku-buildpack-apt"
+    },
+    {
       "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
     },
     {
@@ -17,6 +20,11 @@
     "FFPROBE_PATH": {
       "description": "Caminho para o executável do ffprobe",
       "value": "/app/vendor/ffmpeg/bin/ffprobe"
+    },
+    "PYTHONWARNINGS": {
+      "description": "Configuração para ignorar avisos específicos",
+      "value": "ignore::SyntaxWarning"
     }
-  }
+  },
+  "stack": "heroku-22"
 }
