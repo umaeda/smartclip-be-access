@@ -23,7 +23,8 @@ router = APIRouter()
 
 
 
-@router.post("/", response_model=VideoSchema, dependencies=[Depends(csrf_protect())])
+#@router.post("/", response_model=VideoSchema, dependencies=[Depends(csrf_protect())])
+@router.post("/", response_model=VideoSchema)
 def create_video(
     *,
     db: Session = Depends(get_db),

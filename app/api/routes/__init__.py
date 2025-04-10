@@ -6,8 +6,8 @@ from fastapi import APIRouter
 from app.api.routes.auth import router as auth_router
 from app.api.routes.videos import router as videos_router
 from app.api.routes.credits import router as credits_router
-from app.api.routes.credits import router as credits_router
 from app.api.routes.assistir import router as assistir_router
+from app.api.routes.payments import router as payments_router
 
 api_router = APIRouter()
 
@@ -15,4 +15,5 @@ api_router = APIRouter()
 api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 api_router.include_router(videos_router, prefix="/videos", tags=["videos"])
 api_router.include_router(credits_router, prefix="/credits", tags=["credits"])
-api_router.include_router(assistir_router, prefix="/assistir", tags=["videos"])
+api_router.include_router(assistir_router, prefix="/assistir", tags=["assistir"])
+api_router.include_router(payments_router, prefix="/payments", tags=["payments"])
