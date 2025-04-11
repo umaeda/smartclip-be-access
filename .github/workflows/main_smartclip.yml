@@ -22,7 +22,7 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    # Não são necessárias permissões especiais aqui se usar o login padrão do Azure
+    # Não são necessárias permissões especiais aqui se usar o login padrão do Azure 
 
     steps:
       - name: Checkout repository
