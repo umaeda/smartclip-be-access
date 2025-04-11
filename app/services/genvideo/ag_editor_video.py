@@ -159,7 +159,7 @@ class EditorVideo:
 
         # Configurações de texto para o título
         titulo_clip = TextClip(
-            txt=titulo,
+            titulo,
             fontsize=fontsize,
             color=color,
             font=ftname,
