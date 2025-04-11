@@ -9,7 +9,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Cria um diretório não-root para a aplicação
-RUN mkdir /home/app
+RUN mkdir -p /home/app
 WORKDIR /home/app
 
 # Define variáveis de ambiente necessárias para o Azure Functions
