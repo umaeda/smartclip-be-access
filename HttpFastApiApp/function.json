@@ -1,4 +1,4 @@
-    // HttpFastApiApp/function.json
+
     {
         "scriptFile": "__init__.py",
         "bindings": [
@@ -15,7 +15,7 @@
               "options",
               "patch"
             ],
-            "route": "{*route}" // Captura todas as rotas para passar ao FastAPI
+            "route": "{*route}"
           },
           {
             "type": "http",
