@@ -159,13 +159,13 @@ class EditorVideo:
 
         # Configurações de texto para o título
         titulo_clip = TextClip(
-            titulo,
-            fontsize=fontsize,
+            text=titulo,
+            font_size=fontsize,
             color=color,
             font=ftname,
             stroke_color='black',  # Adiciona uma borda preta para legibilidade
             stroke_width=2
-        ).set_position(position).set_duration(duracao)
+        ).with_position(position).with_duration(duracao)
 
         # Compõe o vídeo original com o título
         video_com_titulo = CompositeVideoClip([video, titulo_clip])
