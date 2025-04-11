@@ -9,6 +9,11 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Adicione estas permissões
+permissions:
+  id-token: write
+  contents: read
+
 env:
   AZURE_FUNCTIONAPP_NAME: 'smartclip'          # Nome do seu Function App (confirmar se está correto)
   ACR_NAME: 'smartclip'                          # !!! Substitua pelo nome do seu Azure Container Registry (sem .azurecr.io) !!!
