@@ -2,75 +2,82 @@
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 # More info on Python, GitHub Actions, and Azure Functions: https://aka.ms/python-webapps-actions
 
-name: Build and Deploy FastAPI Container to Azure Function App - smartclip
+name: Build and deploy Python project to Azure Function App - smartclip
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
-# Adicione estas permissões
-permissions:
-  id-token: write
-  contents: read
-
 env:
-  AZURE_FUNCTIONAPP_NAME: 'smartclip'          # Nome do seu Function App (confirmar se está correto)
-  ACR_NAME: 'smartclip'                          # !!! Substitua pelo nome do seu Azure Container Registry (sem .azurecr.io) !!!
-  IMAGE_NAME: 'smartclip-fastapi'             # Nome que você quer dar para a imagem Docker
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' # set this to the path to your web app project, defaults to the repository root
+  PYTHON_VERSION: '3.12' # set this to the python version to use (supports 3.6, 3.7, 3.8)
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    # Não são necessárias permissões especiais aqui se usar o login padrão do Azure
+    permissions:
+      contents: read #This is required for actions/checkout
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Login no Azure usando os segredos existentes (Service Principal)
-      # Garanta que este SP tenha as roles:
-      # - AcrPush (no seu ACR)
-      # - Contributor ou Website Contributor (no seu Function App)
+      - name: Setup Python version
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Create and start virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Optional: Add step to run tests here
+
+      - name: Zip artifact for deployment
+        run: zip release.zip ./* -r
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-app
+          path: |
+            release.zip
+            !venv/
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write #This is required for requesting the JWT
+      contents: read #This is required for actions/checkout
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: python-app
+
+      - name: Unzip artifact for deployment
+        run: unzip release.zip     
+        
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_31EBBC624F474C89A96B6E581F781A03 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_EF7C8D2182104D628786BDD638F1C935 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_576E4F27674842098E7045F1B6B641C4 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_9F761737948E44C1A8B870E1F619B6EC }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_1A9ABC7A6FD44720974AAC97AEC8C9ED }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_5D4A5AC19A31422E8867E04D62A782ED }}
 
-      # Login no Azure Container Registry (ACR) usando a CLI do Azure
-      - name: Log in to Azure Container Registry
-        run: az acr login --name ${{ env.ACR_NAME }}
-
-      # Build da imagem Docker usando o Dockerfile na raiz do projeto
-      # Tag: Define a tag como nome_completo_no_acr:sha_do_commit e nome_completo_no_acr:latest
-      - name: Build Docker image
-        run: |
-          docker build . -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
-
-      # Push da imagem Docker para o ACR (ambas as tags)
-      - name: Push Docker image to ACR
-        run: |
-          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
-
-      # Deploy da imagem do container para o Azure Function App
-      # Assume que o Function App está configurado para usar Managed Identity com role AcrPull no ACR.
-      - name: Deploy to Azure Functions Container App
-        uses: azure/functions-container-action@v1
+      - name: 'Deploy to Azure Functions'
+        uses: Azure/functions-action@v1
+        id: deploy-to-function
         with:
-          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-          # slot-name: 'Production' # O padrão já é Production
-          image: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          # Se o Function App NÃO usar Managed Identity para puxar a imagem do ACR,
-          # forneça as credenciais do ACR aqui (crie os segredos ACR_USERNAME/ACR_PASSWORD no GitHub):
-          # registry-username: ${{ secrets.ACR_USERNAME }}
-          # registry-password: ${{ secrets.ACR_PASSWORD }}
-
-      # Opcional: Logout da sessão da CLI do Azure
-      - name: Logout from Azure
-        if: always() # Executa mesmo se passos anteriores falharem
-        run: az logout --username ${{ secrets.AZUREAPPSERVICE_CLIENTID_31EBBC624F474C89A96B6E581F781A03 }}
-        # Nota: Usar o client-id para logout assume que o SP fez o login.
+          app-name: 'smartclip'
+          slot-name: 'Production'
+          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
           
