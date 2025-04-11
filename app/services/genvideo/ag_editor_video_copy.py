@@ -195,7 +195,7 @@ class EditorVideo:
         def make_txtclip(txt, **kwargs):
             text_clip = TextClip(
                 text=txt,
-                font="C:/Windows/Fonts/impact.ttf",
+                font="assets/fonts/IMPACT.TTF",
                 font_size=24,
                 color="white",
                 bg_color=None,

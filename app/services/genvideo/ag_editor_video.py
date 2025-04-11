@@ -1,7 +1,7 @@
 import math
 import os
 import random
-from typing import List
+from typing import List, Optional
 from moviepy import vfx, afx
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 from moviepy.video.VideoClip import ImageClip, TextClip, VideoClip
@@ -104,7 +104,7 @@ class EditorVideo:
         final_clip.duration = new_clips[-1].end
         return final_clip
 
-    def adicionar_legenda(self, video: VideoClip, texto: str, ftname: str = 'C:/Windows/Fonts/impact.ttf', fontsize: int = 50, color: str = 'white', position=None) -> CompositeVideoClip:
+    def adicionar_legenda(self, video: VideoClip, texto: str, ftname: str = 'assets/fonts/IMPACT.TTF', fontsize: int = 50, color: str = 'white', position=None) -> CompositeVideoClip:
         """
         Adiciona legendas sincronizadas ao vídeo, dividindo o texto em segmentos ao longo da duração do clipe.
 
@@ -151,33 +151,25 @@ class EditorVideo:
         subtitles = SubtitlesClip(subs, make_textclip=make_txtclip).with_position(position)
         return CompositeVideoClip([video, subtitles])
 
-    def adicionar_titulo(self, video: VideoClip, titulo: str, duration: float = 3.0, fade_duration: float = 1.0, fontsize: int = 70, color: str = 'yellow') -> VideoClip:
-        """
-        Adiciona um título no início do vídeo por um período definido e aplica um fade-out ao título.
+    def adicionar_titulo(self, video: VideoClip, titulo: str, ftname: str = 'assets/fonts/IMPACT.TTF', fontsize: int = 70, color: str = 'white', position=('center', 'top'), duracao: Optional[float] = None) -> CompositeVideoClip:
+        """Adiciona um título ao vídeo."""
+        # Se a duração não for especificada, usa a duração do vídeo
+        if duracao is None:
+            duracao = video.duration
 
-        Parâmetros:
-            video: VideoClip original.
-            titulo: Texto do título a ser exibido.
-            duration: Duração (em segundos) em que o título ficará visível (padrão: 2.0 segundos).
-            fade_duration: Duração (em segundos) do fade-out aplicado ao título (padrão: 1.0 segundo).
-            fontsize: Tamanho da fonte do título (padrão: 50).
-            color: Cor do texto do título (padrão: 'white').
+        # Configurações de texto para o título
+        titulo_clip = TextClip(
+            titulo,
+            fontsize=fontsize,
+            color=color,
+            font=ftname,
+            stroke_color='black',  # Adiciona uma borda preta para legibilidade
+            stroke_width=2
+        ).set_position(position).set_duration(duracao)
 
-        Retorna:
-            VideoClip: O vídeo original com o título sobreposto nos primeiros segundos e com fade-out.
-        """
-        # Cria o TextClip com o título e define sua duração e posição
-        titulo_clip = TextClip(font='C:/Windows/Fonts/impact.ttf', text=titulo, font_size=fontsize, color=color)
-        titulo_clip = titulo_clip.with_duration(duration).with_position(('center', video.h * 0.2))
-
-        # Aplica o efeito de fade-out no final do título
-        fade_out = vfx.FadeOut(duration=fade_duration)
-        titulo_clip = titulo_clip.with_effects([fade_out])
-
-        # Sobrepõe o título ao vídeo; o título inicia no tempo 0
-        final_video = CompositeVideoClip([video, titulo_clip.with_start(0)])
-
-        return final_video
+        # Compõe o vídeo original com o título
+        video_com_titulo = CompositeVideoClip([video, titulo_clip])
+        return video_com_titulo
 
     def adicionar_marca_dagua(self, video: VideoClip, watermark_path: str,
                               proportion: float = 0.05,  # Proporção da largura do vídeo
