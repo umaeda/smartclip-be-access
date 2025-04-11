@@ -1,0 +1,26 @@
+    // HttpFastApiApp/function.json
+    {
+        "scriptFile": "__init__.py",
+        "bindings": [
+          {
+            "authLevel": "anonymous",
+            "type": "httpTrigger",
+            "direction": "in",
+            "name": "req",
+            "methods": [
+              "get",
+              "post",
+              "put",
+              "delete",
+              "options",
+              "patch"
+            ],
+            "route": "{*route}" // Captura todas as rotas para passar ao FastAPI
+          },
+          {
+            "type": "http",
+            "direction": "out",
+            "name": "$return"
+          }
+        ]
+      }
