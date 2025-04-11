@@ -50,7 +50,7 @@ app.add_middleware(
 )
 
 # Add CSRF protection middleware
-app.add_middleware(CSRFMiddleware)
+# app.add_middleware(CSRFMiddleware)
 
 # Include main API router
 from app.api.routes import api_router

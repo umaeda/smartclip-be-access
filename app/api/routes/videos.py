@@ -12,7 +12,7 @@ logger = get_logger("videos")
 
 from app.api.deps import get_db, has_permission, get_current_verified_user
 from app.core.exceptions import VideoNotValidatedException, VideoServiceException, VideoGenerationException, DomainException, map_domain_exception_to_http
-from app.core.csrf import csrf_protect
+#from app.core.csrf import csrf_protect
 from app.models.user import User
 from app.models.video import Video
 from app.schemas.video import VideoCreate, Video as VideoSchema
