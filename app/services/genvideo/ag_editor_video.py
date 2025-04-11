@@ -269,7 +269,7 @@ class EditorVideo:
 
         output = f"{identificador}.mp4"
 
-        video.write_videofile(output, fps=30, codec='h264_qsv', threads=8, preset="fast")
+        video.write_videofile(output, fps=30, codec='libx264', threads=8, preset="fast")
 
         print(os.path.abspath(output))
 
