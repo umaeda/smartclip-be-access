@@ -237,6 +237,12 @@ class EditorVideo:
             str: Caminho absoluto do arquivo de vídeo gerado.
         """
 
+        # --- Memory Optimization Suggestion ---
+        # For large numbers of high-resolution images, consider resizing them
+        # to a resolution closer to the target (e.g., self.width, self.height)
+        # *before* passing the paths to this function. This significantly
+        # reduces the memory needed to load and process each ImageClip.
+
         audio = AudioFileClip(audio_path)
 
         duracao = audio.duration
@@ -255,6 +261,11 @@ class EditorVideo:
         # Aplica transição entre os clipes, se houver mais de um
         video = self.crossfade_transition(clips, transition_duration) if len(clips) > 1 else clips[0]
 
+        # --- Memory Optimization ---
+        # Release references to the initial list of processed clips
+        # as they are now presumably held by the 'video' CompositeVideoClip.
+        del clips
+
         video = video.with_duration(duracao).with_audio(audio)
 
         if legenda_texto:
@@ -269,7 +280,17 @@ class EditorVideo:
 
         output = f"{identificador}.mp4"
 
-        video.write_videofile(output, fps=30, codec='libx264', threads=8, preset="fast")
+        # --- Memory Optimization ---
+        # Reduced threads (e.g., 4) can lower memory usage during encoding,
+        # potentially at the cost of speed. logger='bar' hides verbose FFMPEG output.
+        video.write_videofile(
+            output,
+            fps=30,
+            codec='libx264',
+            threads=4,  # Reduced from 8
+            preset="fast",
+            logger='bar' # Suppress verbose ffmpeg output
+        )
 
         print(os.path.abspath(output))
 
